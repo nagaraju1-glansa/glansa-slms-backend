@@ -28,7 +28,8 @@ class ReportsController extends Controller
             try {
 
                 $query = Receipts::select('towards', DB::raw('SUM(amount) as total_amount'))
-                ->groupBy('towards');
+                ->groupBy('towards')
+                ->where('company_id', $companyId);
 
                 if (!empty($fromDate) && !empty($toDate)) {
                     $query->whereBetween('receipt_date', [$fromDate, $toDate]);
@@ -37,7 +38,8 @@ class ReportsController extends Controller
                 $totalReceiptAmounts = $query->get();
 
                 $query = Payments::select('towards', DB::raw('SUM(amount) as total_amount'))
-                    ->groupBy('towards');
+                    ->groupBy('towards')
+                    ->where('company_id', $companyId);
 
                 if (!empty($fromDate) && !empty($toDate)) {
                     $query->whereBetween('date', [$fromDate, $toDate]);
@@ -58,7 +60,8 @@ class ReportsController extends Controller
         {
             try {
 
-                $query = Receipts::query();
+                $query = Receipts::where('company_id', $companyId);
+
                 if (!empty($fromDate) && !empty($toDate)) {
                     $query->whereBetween('receipt_date', [$fromDate, $toDate]);
                 }
@@ -78,7 +81,7 @@ class ReportsController extends Controller
         {
             try {
 
-                $query = Payments::query();
+                $query = Payments::where('company_id', $companyId);;
                 if (!empty($fromDate) && !empty($toDate)) {
                     $query->whereBetween('date', [$fromDate, $toDate]);
                 }
@@ -98,17 +101,22 @@ class ReportsController extends Controller
             try {
                 $delayThresholdDays = 30;
                 $cutoffDate = Carbon::now()->subDays($delayThresholdDays);
-              $delayedLoans = LoanIssue::whereDate('lastpaiddate', '<', $cutoffDate)
-                            ->where('loanissues.company_id', $companyId)
-                            ->join('members', 'loanissues.mno', '=', 'members.m_no')
-                            ->select('loanissues.*', 'members.name as member_name', 'members.mobile1 as member_phone', 'loanissues.lastpaiddate')
-                            ->get()
-                            ->map(function ($loan) {
-                                $daysDelayed = Carbon::parse($loan->lastpaiddate)->diffInDays(Carbon::now());
-                                $loan->no_of_months = round($daysDelayed / 30); // rounded to nearest month
-                                return $loan;
-                            });
-                            //query db and log
+                 $query = LoanIssue::whereDate('lastpaiddate', '<', $cutoffDate)
+                        ->where('loanissues.company_id', $companyId)
+                        ->join('members', 'loanissues.mno', '=', 'members.m_no')
+                        ->select('loanissues.*', 'members.name as member_name', 'members.mobile1 as member_phone', 'loanissues.lastpaiddate');
+
+                    // 👉 Add date range filter if both dates are present
+                    if (!empty($fromDate) && !empty($toDate)) {
+                        $query->whereBetween('loanissues.lastpaiddate', [$fromDate, $toDate]);
+                    }
+
+                 $delayedLoans = $query->get()
+                ->map(function ($loan) {
+                    $daysDelayed = Carbon::parse($loan->lastpaiddate)->diffInDays(Carbon::now());
+                    $loan->no_of_months = round($daysDelayed / 30);
+                    return $loan;
+                });
                             
                             
                 return response()->json(['data' => $delayedLoans]);
@@ -123,11 +131,17 @@ class ReportsController extends Controller
             try {
                 $delayThresholdDays = 30;
                 $cutoffDate = Carbon::now()->subDays($delayThresholdDays);
-                $delayedSaving = Savings::whereDate('lastpaiddate', '<', $cutoffDate)
+                $query = Savings::whereDate('lastpaiddate', '<', $cutoffDate)
                             ->where('savings.company_id', $companyId)
                             ->join('members', 'savings.m_no', '=', 'members.m_no')  // Adjust column names if needed
-                            ->select('savings.*', 'members.name as member_name', 'members.mobile1 as member_phone') // select needed fields
-                            ->get()
+                            ->select('savings.*', 'members.name as member_name', 'members.mobile1 as member_phone') ;
+
+
+                if (!empty($fromDate) && !empty($toDate)) {
+                    $query->whereBetween('savings.lastpaiddate', [$fromDate, $toDate]);
+                    }
+
+                 $delayedSaving = $query ->get()
                             ->map(function ($loan) {
                                 $daysDelayed = Carbon::parse($loan->lastpaiddate)->diffInDays(Carbon::now());
                                 $loan->no_of_months = round($daysDelayed / 30); // rounded to nearest month

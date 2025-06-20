@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
-
+use App\Models\MainBranch;
 
 
 class DashboardController extends Controller
@@ -77,7 +77,14 @@ class DashboardController extends Controller
         ->where('A.company_id', $companyId)
         ->first();
 
-    return response()->json($data);
+        $branch = MainBranch::where('main_branch_id', auth()->user()->main_branch_id)->first();
+
+        $data->name = $branch->name;
+        $data->subscription_start = $branch->subscription_start;
+        $data->subscription_end = $branch->subscription_end;
+        $data->subscription_status = $branch->subscription_status;
+
+        return response()->json($data);
 
 
     }

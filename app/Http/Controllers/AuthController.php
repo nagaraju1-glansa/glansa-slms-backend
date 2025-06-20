@@ -14,30 +14,16 @@ use App\Models\Permission;
 
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use App\Models\MainBranch;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
-  
-    // public function login()
-    // {
-    //     $user = User::where([
-    //     ['username', '=', request('username')],
-    //     // ['company_id', '=', request('company_id')],
-    //     ])->first();
-    //      if (! $user || ! Hash::check(request('password'), $user->password)) {
-    //         return response()->json(['error' => 'Unauthorized',
-    //         'message' => request('password')
-    //     ], 401);
-    //     }
 
-    //     // Generate token
-    //     $token = auth('api')->login($user);
-    //     return $this->respondWithToken($token);
 
-    // }
-
-public function login(Request $request)
-{
+    public function login(Request $request)
+    {
         $type = $request->input('type');
 
         if ($type === 'company') {
@@ -50,43 +36,128 @@ public function login(Request $request)
                 ], 401);
             }
 
+            // ✅ Subscription check using MainBranch model
+            $branch = MainBranch::where('main_branch_id', $user->main_branch_id)->first();
+
+            if (
+                !$branch ||
+                $branch->subscription_status != '1' ||
+                // Carbon::parse($branch->subscription_end)->lt(now()) ||
+                $user->status != '1')
+             {
+                return response()->json([
+                    'error' => 'Unauthorized',
+                    'message' => 'Company subscription expired or inactive.'
+                ], 401);
+            }
+
+            // ✅ Generate token
             $token = auth('api')->login($user);
 
             return response()->json([
                 'access_token' => $token,
                 'user' => $user
             ]);
-        }
+    }
 
-       if ($type === 'member') {
-            $member = Member::where('m_no', $request->member_no)
-                            ->where('aadhaarno', $request->aadhar_no)
-                            ->where('isactive', 1)
-                            ->first();
+    if ($type === 'member') {
+        $cleanedAadhar = preg_replace('/\D/', '', $request->aadhar_no);
+        $member = Member::where('m_no', $request->member_no)
+                        ->where(DB::raw("REPLACE(aadhaarno, ' ', '')"), $cleanedAadhar)
+                        ->where('isactive', 1)
+                        ->first();
 
-            if (! $member) {
-                return response()->json([
-                    'error' => 'Unauthorized',
-                    'message' => 'Invalid Member No. or Aadhar No.'
-                ], 401);
-            }
-
-            $token = auth('member')->login($member); // Use member guard
-            $member->role_id = $member->designation;
-            $member->usertype = 'Member';
-            $member->m_no_encpt = Crypt::encryptString($member->m_no);
-
+        if (! $member) {
             return response()->json([
-                'access_token' => $token,
-                'user' => $member
-            ]);
+                'error' => 'Unauthorized',
+                'message' => 'Invalid Member No. or Aadhar No.'
+            ], 401);
         }
+
+        // ✅ Subscription check using MainBranch model
+        // $branch = MainBranch::where('main_branch_id', $member->main_branch_id)->first();
+
+        //  if (
+        //         !$branch ||
+        //         $branch->subscription_status != '1' 
+             
+        //     ) {
+        //         return response()->json([
+        //             'error' => 'Unauthorized',
+        //             'message' => 'Company subscription expired or inactive.'
+        //         ], 401);
+        //     }
+
+        $token = auth('member')->login($member); // Use member guard
+
+        $member->role_id = $member->designation;
+        $member->usertype = 'Member';
+        $member->m_no_encpt = Crypt::encryptString($member->m_no);
 
         return response()->json([
-            'error' => 'Invalid login type'
-        ], 400);
-
+            'access_token' => $token,
+            'user' => $member
+        ]);
     }
+
+    return response()->json([
+        'error' => 'Invalid login type'
+    ], 400);
+}
+
+
+    // public function login(Request $request)
+    // {
+    //     $type = $request->input('type');
+
+    //     if ($type === 'company') {
+    //         $user = User::where('username', $request->username)->first();
+
+    //         if (! $user || ! Hash::check($request->password, $user->password)) {
+    //             return response()->json([
+    //                 'error' => 'Unauthorized',
+    //                 'message' => 'Invalid username or password'
+    //             ], 401);
+    //         }
+            
+
+    //         $token = auth('api')->login($user);
+
+    //         return response()->json([
+    //             'access_token' => $token,
+    //             'user' => $user
+    //         ]);
+    //     }
+
+    //    if ($type === 'member') {
+    //         $member = Member::where('m_no', $request->member_no)
+    //                         ->where('aadhaarno', $request->aadhar_no)
+    //                         ->where('isactive', 1)
+    //                         ->first();
+
+    //         if (! $member) {
+    //             return response()->json([
+    //                 'error' => 'Unauthorized',
+    //                 'message' => 'Invalid Member No. or Aadhar No.'
+    //             ], 401);
+    //         }
+
+    //         $token = auth('member')->login($member); // Use member guard
+    //         $member->role_id = $member->designation;
+    //         $member->usertype = 'Member';
+    //         $member->m_no_encpt = Crypt::encryptString($member->m_no);
+
+    //         return response()->json([
+    //             'access_token' => $token,
+    //             'user' => $member
+    //         ]);
+    //     }
+
+    //     return response()->json([
+    //         'error' => 'Invalid login type'
+    //     ], 400);
+
+    // }
 
 
     public function me(Request $request)

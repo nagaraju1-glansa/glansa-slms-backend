@@ -22,4 +22,9 @@ class CompanyUser extends Authenticatable
         'main_branch_id',
     ];
 
+    public function company()
+    {
+        return $this->belongsTo(MainBranch::class, 'main_branch_id', 'main_branch_id');
+    }
+
 }

@@ -121,7 +121,7 @@ class CompanyController extends Controller
                 ->orderByDesc('receipt_date')
                 ->first();
             if ($lastReceipt) {
-                $lateFee = $this->calculateLateFee($lastReceipt->lastpaiddate);
+                $lateFee = $this->calculateLateFee($lastReceipt->lastpaiddate , $companyId);
             }
         }
 
@@ -132,7 +132,7 @@ class CompanyController extends Controller
         ]);
     }
 
-   private function calculateLateFee($lastPaidDate)
+   private function calculateLateFee($lastPaidDate , $companyId)
     {
         $now = Carbon::now();
         $lastPaid = Carbon::parse($lastPaidDate);
@@ -150,6 +150,7 @@ class CompanyController extends Controller
 
         // Get rules for that set
         $feeRules = \DB::table('saving_late_fee')
+            ->where('company_id', $companyId)
             ->orderBy('from_date')
             ->get();
 

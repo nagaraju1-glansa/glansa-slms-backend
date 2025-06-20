@@ -97,4 +97,9 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->belongsTo(Role::class);
     }
+
+    public function mainbranch()
+    {
+        return $this->belongsTo(MainBranch::class, 'main_branch_id', 'main_branch_id');
+    }
 }

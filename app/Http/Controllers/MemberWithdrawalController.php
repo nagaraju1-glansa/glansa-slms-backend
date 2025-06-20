@@ -93,7 +93,9 @@ class MemberWithdrawalController extends Controller
         try {
             $decryptedMNo = Crypt::decryptString($encryptedMNo);
 
-            $member = Member::with(['savings',  'loanissues.statusOption'])->findOrFail($decryptedMNo);
+            $member = Member::with(['savings', 'loanissues.statusOption'])
+                ->where('m_no', $decryptedMNo)
+                ->firstOrFail();
 
             // Add interest calculation for each loan issue
             $member->loanissues->transform(function ($loan) {
@@ -113,7 +115,7 @@ class MemberWithdrawalController extends Controller
 
             return response()->json($member);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Invalid or corrupted m_no.'], 400);
+            return response()->json(['error' => 'Invalid or corrupted m_no.' ], 400);
         }
     }
 

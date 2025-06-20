@@ -68,6 +68,23 @@ class MemberController extends Controller
         $data['entrydate'] = Carbon::now(); // Add the entrydate field
         $data['entryby'] = auth()->user()->employeeid;
 
+         // ✅ Generate m_no = company_id + last m_no under this company + 1
+        $lastMember = Member::where('company_id', $companyId)
+                        ->orderByDesc('id')
+                        ->first();
+
+        if ($lastMember && $lastMember->m_no) {
+            // Extract number part by removing company prefix
+            $lastNumber = (int) substr($lastMember->m_no, strlen((string)$companyId));
+        } else {
+            $lastNumber = 0;
+        }
+
+        // New m_no
+        $newMno = $companyId . str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT); // e.g., 3001, 3002
+        $data['m_no'] = $newMno;
+
+
         $member = Member::create($data);
         
             // Then handle image upload and move
@@ -310,7 +327,7 @@ class MemberController extends Controller
 
         $members = Member::where('company_id', $companyId)
         ->orderBy('m_no', 'desc')
-        ->select('m_no','image')
+        ->select('m_no','image','doj')
         ->where('isactive', 1)
         ->get()->map(function ($member) {
             $member->m_no_encpt = Crypt::encryptString($member->m_no);
