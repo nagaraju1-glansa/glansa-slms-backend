@@ -20,7 +20,11 @@ class MainBranch extends Model
         'subscription_start',
         'subscription_end',
         'subscription_status',
-        'date'
+        'company_address',
+        'mandal',
+        'dist',
+        'pincode',
+        'entrydate'
     ];
 
     // Example relationship if a company has users

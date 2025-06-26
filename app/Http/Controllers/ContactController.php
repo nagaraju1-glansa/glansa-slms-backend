@@ -19,7 +19,7 @@ class ContactController extends Controller
 
         $data = $request->all(); // from ReactJS
 
-        $email = 'im.nagraaz@gmail.com';
+        $email = 'nagaraju1.glansa@gmail.com';
         Mail::to($email)->send(new CommonFormMail($data, 'contact_form'));
 
         return response()->json(['success' => true, 'message' => 'Message sent successfully']);

@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class DropDownOptions extends Model
+class DropdownOptions extends Model
 {
 
     // Define the table name

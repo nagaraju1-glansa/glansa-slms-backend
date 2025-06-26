@@ -11,6 +11,7 @@ use App\Models\LoanIssue;
 use Carbon\Carbon;
 use DB;
 use App\Models\LoanLateFee;
+use App\Models\Member;
 
 class ReceiptController extends Controller
 {
@@ -22,7 +23,7 @@ class ReceiptController extends Controller
                     ? cache()->get('superadmin_company_' . auth()->id(), 0)
                     : auth()->user()->company_id;
 
-        $query = Receipts::with(['user:employeeid,name']) 
+        $query = Receipts::with(['user:employeeid,name','member:member_id,m_no']) 
         ->where('company_id', $companyId);
 
             if ($request->has('towardscode')) {
@@ -45,7 +46,8 @@ class ReceiptController extends Controller
                 $query->where('membername', 'like', '%' . $search . '%')
                       ->orWhere('m_no', 'like', '%' . $search . '%')
                       ->orWhere('receipt_date', 'like', '%' . $search . '%')
-                      ->orWhere('towards', 'like', '%' . $search . '%');
+                      ->orWhere('towards', 'like', '%' . $search . '%')
+                      ->orWhere('member_id', 'like', '%' . $search . '%'); // <-- Added line
             });
         }
 
@@ -68,12 +70,32 @@ public function store(Request $request)
         $monthEnd = $receiptDate->copy()->endOfMonth();
         $mno = Crypt::decryptString($data['m_no']);
 
+        $repaymentMode = 70; // default to monthly
+
+        if ((int) $data['towardscode'] === 47 && !empty($data['loanacntno'])) {
+            $loan = LoanIssue::where('accountno', $data['loanacntno'])->first();
+
+            if ($loan && isset($loan->modeofrepayment)) {
+                $repaymentMode = (int) $loan->modeofrepayment;
+            }
+        }
+
+
          // ✅ Check for duplicate payment in the same month
-        $alreadyPaid = Receipts::where('company_id', $companyId)
+        $query = Receipts::where('company_id', $companyId)
             ->where('m_no', $mno)
-            ->where('towardscode', $data['towardscode'])
-            ->whereBetween('receipt_date', [$monthStart, $monthEnd])
-            ->exists();
+            ->where('towardscode', $data['towardscode']);
+            if ($data['towardscode'] === 47 && $repaymentMode === 69) {
+                // Daily repayment: block duplicate for same day
+                $query->whereDate('receipt_date', $receiptDate);
+            } else {
+                // Monthly (default): block duplicate for same month
+                $monthStart = $receiptDate->copy()->startOfMonth();
+                $monthEnd = $receiptDate->copy()->endOfMonth();
+                $query->whereBetween('receipt_date', [$monthStart, $monthEnd]);
+            }
+            // ->whereBetween('receipt_date', [$monthStart, $monthEnd])
+           $alreadyPaid = $query->exists();
 
         if ($alreadyPaid) {
             return response()->json([
@@ -183,6 +205,10 @@ public function store(Request $request)
 
             } 
         }
+        // Fetch member_id based on m_no
+        $member = Member::where('m_no', $mno)->first();
+        $memberId = $member ? $member->member_id : null;
+        $receipt->member_id = $memberId;
         return $receipt;
     });
 

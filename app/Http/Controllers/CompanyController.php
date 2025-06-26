@@ -15,7 +15,9 @@ use App\Models\Receipts;
 class CompanyController extends Controller
 {
     public function index() {
-       $users = CompanyUser::where('status', 1)->get()->map(function ($user) {
+       $users = CompanyUser::where('status', 1)
+                            ->where('main_branch_id', auth('api')->user()->main_branch_id)
+                            ->get()->map(function ($user) {
             $user->comapany_id_encpt = Crypt::encryptString($user->comapany_id);
             return $user;
         });
@@ -65,7 +67,7 @@ class CompanyController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'User saved successfully',
+                'message' => 'Company saved successfully',
                 'user' => $user,
             ]);
         }
@@ -76,7 +78,7 @@ class CompanyController extends Controller
         $user->update($data);
         return response()->json([
             'success' => true,
-            'message' => 'User updated successfully',
+            'message' => 'Company updated successfully',
             'user' => $user,
         ]);
     }

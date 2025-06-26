@@ -20,7 +20,7 @@ class PaymentsController extends Controller
                         : auth()->user()->company_id;
 
             $query = Payments::query()
-            ->with(['user:employeeid,name']) 
+            ->with(['user:employeeid,name','member:member_id,m_no']) 
             ->where('company_id', $companyId);
 
             // Apply search if provided

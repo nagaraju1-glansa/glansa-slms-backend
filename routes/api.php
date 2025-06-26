@@ -19,6 +19,7 @@ use App\Http\Controllers\RazorPaymentController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\ForGlansaApiController;
 
 // 
 
@@ -34,7 +35,9 @@ use App\Http\Controllers\ContactController;
 Route::group(['prefix' => 'auth'], function ($router) {
     Route::post('login', [AuthController::class, 'login']);
     Route::get('companys', [CompanyController::class, 'index']);
-   Route::post('/contact-form', [ContactController::class, 'sendMail']);
+    Route::post('/contact-form', [ContactController::class, 'sendMail']);
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 });
 
 Route::middleware('auth:api')->group(function(){
@@ -117,6 +120,16 @@ Route::middleware('auth:api')->group(function(){
     Route::get('/permissions', [PermissionController::class, 'index']);
     Route::post('/roles/{id}', [RoleController::class, 'update']);
     Route::delete('/receiptdelete/{id}', [ReceiptController::class, 'destroy']);
+
+    //ForGlansaApiController
+    Route::get('forglansa-allbranches', [ForGlansaApiController::class, 'getallbranches']);
+    Route::get('forglansa-companypayments-monthly', [ForGlansaApiController::class, 'companyPaymentsMonthlyReport']);
+    Route::post('forglansa-maincompanyadd', [ForGlansaApiController::class, 'storeProductOwnerData']);
+    Route::get('forglansa-allcompanypayments', [ForGlansaApiController::class, 'getallCopmanyPayment']);
+    Route::post('/update-main-branch-subscription/{main_branch_id}', [ForGlansaApiController::class, 'updateSubscription']);
+    Route::post('/addcompanypayment', [ForGlansaApiController::class, 'PaymentStore']);
+    Route::post('/editcompanypayment/{id}', [ForGlansaApiController::class, 'PaymentUpdate']);
+
 
 });
 

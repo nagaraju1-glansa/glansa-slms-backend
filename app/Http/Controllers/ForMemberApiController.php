@@ -24,7 +24,7 @@ class ForMemberApiController extends Controller
         // $companyId = auth()->user()->company_id;
         $m_no = auth()->user()->m_no;
 
-        $query = Receipts::with(['user:employeeid,name']) // eager load user with only ID and name
+        $query = Receipts::with(['user:employeeid,name','member:member_id,m_no']) // eager load user with only ID and name
                 ->where('m_no', $m_no);
 
          if ($request->has('towardscode')) {
@@ -45,9 +45,10 @@ class ForMemberApiController extends Controller
             // Apply the search to multiple fields
             $query->where(function ($query) use ($search) {
                 $query->where('membername', 'like', '%' . $search . '%')
-                      ->orWhere('m_no', 'like', '%' . $search . '%')
+                      ->orWhere('member_id', 'like', '%' . $search . '%')
                       ->orWhere('receipt_date', 'like', '%' . $search . '%')
-                      ->orWhere('towards', 'like', '%' . $search . '%');
+                      ->orWhere('towards', 'like', '%' . $search . '%')
+                      ->orWhere('member_id', 'like', '%' . $search . '%'); // <-- Added line
             });
         }
 
@@ -63,7 +64,8 @@ class ForMemberApiController extends Controller
             $companyId = auth()->user()->role_id === 1
                         ? cache()->get('superadmin_company_' . auth()->id(), 0)
                         : auth()->user()->company_id;
-            $query = LoanIssue::query()->where('company_id', $companyId)
+            $query = LoanIssue::with(['member:member_id,m_no'])
+                    ->where('company_id', $companyId)
                                         ->where('mno', $m_no);
             if ($request->has('search') && $request->input('search') != '') {
                 $search = $request->input('search');

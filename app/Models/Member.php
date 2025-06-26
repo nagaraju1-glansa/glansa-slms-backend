@@ -9,9 +9,9 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
 class Member extends Authenticatable implements JWTSubject
 {
     protected $table = 'members'; // Optional, Laravel uses 'members' by default for 'Member'
-    protected $primaryKey = 'id';
+    protected $primaryKey = 'm_no';
     protected $fillable = [
-        'm_no',
+        'member_id',
         'company_id',
         'name',
         'aliasname',

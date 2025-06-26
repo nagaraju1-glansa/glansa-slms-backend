@@ -70,20 +70,19 @@ class MemberController extends Controller
 
          // ✅ Generate m_no = company_id + last m_no under this company + 1
         $lastMember = Member::where('company_id', $companyId)
-                        ->orderByDesc('id')
+                        ->orderByDesc('m_no')
                         ->first();
 
-        if ($lastMember && $lastMember->m_no) {
+        if ($lastMember && $lastMember->member_id) {
             // Extract number part by removing company prefix
-            $lastNumber = (int) substr($lastMember->m_no, strlen((string)$companyId));
+            $lastNumber = (int) substr($lastMember->member_id, strlen((string)$companyId));
         } else {
             $lastNumber = 0;
         }
 
         // New m_no
         $newMno = $companyId . str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT); // e.g., 3001, 3002
-        $data['m_no'] = $newMno;
-
+        $data['member_id'] = $newMno;
 
         $member = Member::create($data);
         
@@ -93,7 +92,7 @@ class MemberController extends Controller
                 $extension = $image->getClientOriginalExtension();
 
                 // Generate filename based on m_mno
-                $filename = $member->m_mno . '.' . $extension;
+                $filename = $member->m_no . '.' . $extension;
 
                 // Store the file in 'uploads' directory with new name
                 $path = $image->storeAs('uploads/members', $filename, 'public');
@@ -103,7 +102,7 @@ class MemberController extends Controller
 
                 // Update the member record with image URL
                 $member->update([
-                    'image' => $url,
+                    'image' => $filename,
                 ]);
             }
 
@@ -271,7 +270,7 @@ class MemberController extends Controller
 
                 // Update the member record with image URL
                 $member->update([
-                    'image' => $url,
+                    'image' => $filename,
                 ]);
             }
 
@@ -327,7 +326,7 @@ class MemberController extends Controller
 
         $members = Member::where('company_id', $companyId)
         ->orderBy('m_no', 'desc')
-        ->select('m_no','image','doj')
+        ->select('m_no','member_id','image','doj')
         ->where('isactive', 1)
         ->get()->map(function ($member) {
             $member->m_no_encpt = Crypt::encryptString($member->m_no);
@@ -434,16 +433,9 @@ class MemberController extends Controller
             if (!$loanCleared) {
                 $member->message = 'Not eligible, previous loan(s) not cleared.';
             } 
-            elseif ($member->months_since_join < 12) {
-                // if ($member->months_since_join < 12) {
-                    $member->eligible = false;
-                    $member->message = 'Not eligible, membership duration less than 12 months.';
-                // } 
-                // else{
-                //     $member->eligible = false;
-                //     $member->message = 'Not eligible, saving balance is below 1200.';
-                // }
-                
+            elseif ($member->months_since_join < $company->loan_eligibility) {
+                $member->eligible = false;
+                $member->message = 'Not eligible, membership duration less than ' . $company->loan_eligibility . ' months.';
             } else {
                 $member->eligible = true;
                 $member->message = 'New loan eligible';

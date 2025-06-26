@@ -40,4 +40,8 @@ class Payments extends Model
     {
         return $this->belongsTo(User::class, 'entryby');
     }
+    public function member()
+    {
+        return $this->belongsTo(Member::class, 'mno', 'm_no'); // 'mno' is the foreign key in payments, 'm_no' is the primary key in Member
+    }
 }

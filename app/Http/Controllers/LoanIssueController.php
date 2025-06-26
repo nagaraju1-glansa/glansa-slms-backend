@@ -26,7 +26,8 @@ class LoanIssueController extends Controller
             $companyId = auth()->user()->role_id === 1
                         ? cache()->get('superadmin_company_' . auth()->id(), 0)
                         : auth()->user()->company_id;
-            $query = LoanIssue::query()->where('company_id', $companyId);
+            $query = LoanIssue::with(['member:member_id,m_no'])
+                  ->where('company_id', $companyId);
             if ($request->has('search') && $request->input('search') != '') {
                 $search = $request->input('search');
                 $query->where(function ($query) use ($search) {
@@ -54,7 +55,8 @@ class LoanIssueController extends Controller
     public function getByLoanId($loanId)
     {
         $loanId = Crypt::decrypt($loanId);
-        $loanIssue = LoanIssue::find($loanId); // Find loan issue by loan_id
+        $loanIssue = LoanIssue::with(['member:member_id,m_no,image'])
+                    ->find($loanId); // Find loan issue by loan_id
         if ($loanIssue) {
             // $loanIssue->surity1mno = Crypt::encrypt($loanIssue->surity1mno);
 
@@ -215,13 +217,13 @@ class LoanIssueController extends Controller
             $loanissue->eligibleinstallments   = $data['eligibleinstallments'];
             $loanissue->eligibleamt    = $data['eligibleamt'];
             $loanissue->loanpending    = $data['issueamount'] ?? 0;
-            $loanissue->surity1mno     = $data['surity1mno'];
-            $loanissue->surity1mname   = $data['surity1mname'];
-            $loanissue->surity1details   = $data['surity1details'];
-            $loanissue->surity2mno     = $data['surity2mno'];
-            $loanissue->surity2mname   = $data['surity2mname'];
-            $loanissue->surity2details   = $data['surity2details'];
-            $loanissue->clearancedate   = $data['clearancedate'];
+            $loanissue->surity1mno     = $data['surity1mno'] ?? null;
+            $loanissue->surity1mname   = $data['surity1mname'] ?? null;
+            $loanissue->surity1details = $data['surity1details'] ?? null;
+            $loanissue->surity2mno     = $data['surity2mno'] ?? null;
+            $loanissue->surity2mname   = $data['surity2mname'] ?? null;
+            $loanissue->surity2details = $data['surity2details'] ?? null;
+            $loanissue->clearancedate  = $data['clearancedate'] ?? null;
 
 
             $loanissue->entrydate      = now();
@@ -244,7 +246,7 @@ class LoanIssueController extends Controller
         // \Log::error('Receipt store failed: ' . $e->getMessage());
 
         return response()->json([
-            'error' => 'Failed to save receipt.',
+            'error' => 'Failed to save loan.',
             'details' => $e->getMessage()
         ], 500);
     }

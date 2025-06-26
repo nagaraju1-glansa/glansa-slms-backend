@@ -27,13 +27,23 @@ class RoleController extends Controller
     public function store(Request $request)
     {
         $companyId = auth()->user()->role_id === 1
-        ? cache()->get('superadmin_company_' . auth()->id(), 0)
-        : auth()->user()->company_id;
+            ? cache()->get('superadmin_company_' . auth()->id(), 0)
+            : auth()->user()->company_id;
 
-        $request->validate(['name' => 'required|unique:roles']);
-        Role::create(['name' => $request->name , 'company_id' => $companyId]);
+        $request->validate([
+            'name' => [
+                'required',
+                \Illuminate\Validation\Rule::unique('roles')->where(function ($query) use ($companyId) {
+                    return $query->where('company_id', $companyId);
+                }),
+            ],
+        ]);
+
+        Role::create(['name' => $request->name, 'company_id' => $companyId]);
+
         return response()->json(['success' => true, 'message' => 'Role created successfully.']);
     }
+
      public function update(Request $request)
      {
          $request->validate(['name' => 'required']);

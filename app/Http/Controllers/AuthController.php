@@ -18,6 +18,11 @@ use App\Models\MainBranch;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
+use App\Mail\CommonFormMail;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+
+
 class AuthController extends Controller
 {
 
@@ -61,9 +66,12 @@ class AuthController extends Controller
     }
 
     if ($type === 'member') {
-        $cleanedAadhar = preg_replace('/\D/', '', $request->aadhar_no);
-        $member = Member::where('m_no', $request->member_no)
-                        ->where(DB::raw("REPLACE(aadhaarno, ' ', '')"), $cleanedAadhar)
+        $cleanedInput  = preg_replace('/\D/', '', $request->aadhar_no);
+        $member = Member::where('member_id', $request->member_no)
+                         ->where(function ($query) use ($cleanedInput) {
+                                $query->where(DB::raw("REPLACE(aadhaarno, ' ', '')"), $cleanedInput)
+                                    ->orWhere(DB::raw("REPLACE(mobileno, ' ', '')"), $cleanedInput);
+                            })
                         ->where('isactive', 1)
                         ->first();
 
@@ -97,6 +105,24 @@ class AuthController extends Controller
         return response()->json([
             'access_token' => $token,
             'user' => $member
+        ]);
+    }
+
+    if ($type === 'glansa') {
+        $user = User::where('username', $request->username)->first();
+
+        if (! $user || ! Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'error' => 'Unauthorized',
+                'message' => 'Invalid username or password'
+            ], 401);
+        }
+
+        $token = auth('api')->login($user);
+
+        return response()->json([
+            'access_token' => $token,
+            'user' => $user
         ]);
     }
 
@@ -262,18 +288,30 @@ class AuthController extends Controller
             if ($request->hasFile('image')) {
                 $image = $request->file('image');
                 $extension = $image->getClientOriginalExtension();
-                $filename = $user->m_mno . '.' . $extension;
+                $filename = $user->employeeid . '.' . $extension;
                 $path = $image->storeAs('uploads', $filename, 'public');
                 $url = asset('storage/employees' . $path);
                 $user->update([
-                    'image' => $url
+                    'image' => $filename
                 ]);
             }
 
+        $formData = [
+            'name' => $request->name,
+            'username' => $request->username,
+            'password' => $request->password, // Send plain password (or generated one)
+        ];
+
+        Mail::to($request->email)->send(new CommonFormMail($formData, 'user_created'));
+        
         return response()->json([
             'success' => true,
+            'message' => 'Employee added successfully',
             'user' => $user,
         ]);
+
+        // Send welcome email with credentials
+        
     }
 
     public function editUser(Request $request, $id) {
@@ -330,13 +368,13 @@ class AuthController extends Controller
                 $path = $image->storeAs('uploads/employees', $filename, 'public');
                 $url = asset('storage/' . $path);
                 $user->update([
-                    'image' => $url
+                    'image' => $filename
                 ]);
             }
             
             return response()->json([
                 'success' => true,
-                'message' => 'User updated successfully',
+                'message' => 'Employee updated successfully',
                 'user' => $data,
             ]);
        }
@@ -354,6 +392,7 @@ class AuthController extends Controller
                     : auth()->user()->company_id;
 
             $users = User::where('company_id', $companyId)
+                ->where('main_branch_id', auth()->user()->main_branch_id)
                 ->where('status', 1)
                 ->orderBy('employeeid', 'desc')
                 ->get()
@@ -379,6 +418,82 @@ class AuthController extends Controller
                 'message' => $e->getMessage(),
             ]);
        }
+    }
+
+public function forgotPassword(Request $request)
+{
+    $type = $request->input('type');
+    $email = $request->input('email');
+
+    if ($type == 'company') {
+        $user = User::where('email', $email)->first();
+    } elseif ($type == 'member') {
+        $user = Member::where('email', $email)->first();
+    } else {
+        return response()->json(['error' => 'Invalid user type'], 400);
+    }
+
+    if (!$user) {
+        return response()->json(['error' => 'Email not found'], 404);
+    }
+
+    $token = Str::random(60);
+
+    // Store token manually (ensure you have password_resets table)
+    DB::table('password_resets')->updateOrInsert(
+        ['email' => $email],
+        ['token' => Hash::make($token), 'created_at' => now()]
+    );
+
+    // Set your custom reset link here
+    $baseUrl = rtrim(env('MAIN_WEBSITE'), '/');
+    $resetLink = "{$baseUrl}/reset-password?token={$token}&email=" . urlencode($email) . "&type=" . $type;
+    // $resetLink = "https://glansafin.glansadesigns.com/reset-password?token={$token}?email=" . urlencode($email) . "&type=" . $type;
+
+    // Prepare form data for the mail
+    $formData = [
+        'name' => $user->name ?? 'User',
+        'reset_link' => $resetLink,
+    ];
+
+    // ✅ Use your custom mail class
+    Mail::to($email)->send(new CommonFormMail($formData, 'forgot_password'));
+
+    return response()->json(['message' => 'Reset password link sent to your email.']);
+}
+
+
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'token' => 'required',
+            'password' => 'required|min:6|confirmed',
+            'type' => 'required|in:company,member',
+        ]);
+
+        $resetRecord = DB::table('password_resets')->where('email', $request->email)->first();
+
+        if (!$resetRecord || !Hash::check($request->token, $resetRecord->token)) {
+            return response()->json(['error' => 'Invalid or expired token'], 400);
+        }
+
+        if ($request->type === 'company') {
+            $user = User::where('email', $request->email)->first();
+        } else {
+            $user = Member::where('email', $request->email)->first();
+        }
+
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        DB::table('password_resets')->where('email', $request->email)->delete();
+
+        return response()->json(['message' => 'Password updated successfully']);
     }
 
 
